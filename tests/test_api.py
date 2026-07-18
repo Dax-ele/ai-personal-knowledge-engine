@@ -1,0 +1,12 @@
+from fastapi.testclient import TestClient
+from ai_brain.main import app
+
+
+client = TestClient(app)
+
+
+def test_home():
+    response = client.get("/")
+    
+    assert response.status_code == 200
+    assert response.json()["message"] == "AI Personal Knowledge Engine is running"

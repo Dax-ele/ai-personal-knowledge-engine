@@ -1,3 +1,4 @@
+-e git+https://github.com/Dax-ele/ai-personal-knowledge-engine.git@7fddf2f805ad967cfc87ac43ec68cdd395861357#egg=ai_personal_knowledge_engine
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.14.2
