@@ -1,0 +1,1 @@
+AI Personal Knowledge Engine è un sistema che aiuta gli utenti a organizzare, comprendere e interrogare la propria conoscenza tramite tecniche di AI come embeddings, RAG e machine learning.
