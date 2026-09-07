@@ -383,3 +383,1043 @@ Secondo me hai affrontato la parte più difficile del progetto: impostare basi s
 Noi abbiamo fatto il contrario: abbiamo costruito un progetto che cresce in modo professionale, con Git, test, struttura src, notebook per la sperimentazione e componenti riutilizzabili. È un approccio più lento all'inizio, ma tra qualche mese farà una differenza enorme nel tuo portfolio e nella tua preparazione per un ruolo da AI Engineer.
 
 La prossima volta inizieremo a lavorare con documenti reali. Da lì il progetto smetterà di essere un esercizio sugli embeddings e inizierà a diventare il tuo vero AI Personal Knowledge Engine.
+
+
+
+
+# Sessione - Sprint 2 / Introduzione Semantic Search
+
+## Data
+18/07/2026
+
+---
+
+# Obiettivo della sessione
+
+Continuare la costruzione della pipeline AI del progetto.
+
+Obiettivo principale:
+
+- completare la fase di indicizzazione della knowledge base;
+- progettare il futuro sistema di ricerca semantica;
+- introdurre il concetto di query embedding;
+- preparare la struttura per implementare la semantic search.
+
+---
+
+# Stato iniziale
+
+Prima della sessione il progetto era in grado di:
+
+- caricare documenti Markdown;
+- trasformarli in oggetti Document;
+- generare embeddings tramite EmbeddingService;
+- salvare documenti ed embeddings in `data/knowledge_base.json`.
+
+Pipeline precedente:
+
+
+Documenti Markdown
+
+    |
+    v
+
+DocumentLoader
+
+    |
+    v
+
+Document
+
+    |
+    v
+
+EmbeddingService
+
+    |
+    v
+
+DocumentEmbedding
+
+    |
+    v
+
+knowledge_base.json
+
+
+---
+
+# Decisioni architetturali prese
+
+## 1. Separazione delle responsabilità
+
+Abbiamo deciso di mantenere separati:
+
+- creazione embeddings;
+- gestione documenti;
+- persistenza;
+- ricerca.
+
+Motivazione:
+
+Evitare servizi troppo complessi con troppe responsabilità.
+
+Principio applicato:
+
+> Ogni componente deve avere una responsabilità chiara.
+
+---
+
+# Creazione modulo Knowledge
+
+È stato creato:
+
+
+src/ai_brain/knowledge/
+
+├── init.py
+├── models.py
+└── repository.py
+
+
+---
+
+# Nuovo modello: DocumentEmbedding
+
+File:
+
+
+knowledge/models.py
+
+
+Creato il modello:
+
+```python
+@dataclass
+class DocumentEmbedding:
+    document: Document
+    embedding: list[float]
+Motivazione
+
+Separare:
+
+il documento originale;
+la sua rappresentazione matematica.
+
+Un documento contiene informazioni leggibili dall'uomo.
+
+Un embedding contiene una rappresentazione numerica utilizzabile dagli algoritmi AI.
+
+Esempio:
+
+Document
+
+{
+ title:
+ content:
+}
+
+
++
+
+Embedding
+
+[
+0.123,
+0.456,
+...
+]
+
+=
+
+DocumentEmbedding
+Creazione KnowledgeRepository
+
+File:
+
+knowledge/repository.py
+
+Responsabilità:
+
+Gestire la persistenza della knowledge base.
+
+Attualmente utilizza:
+
+JSON
+
+File generato:
+
+data/knowledge_base.json
+Perché JSON?
+
+Non è la soluzione definitiva.
+
+In futuro verrà probabilmente sostituito da:
+
+ChromaDB;
+FAISS;
+Qdrant;
+Pinecone.
+
+È stato scelto perché:
+
+semplice;
+facilmente ispezionabile;
+utile per capire il funzionamento interno della pipeline.
+Creazione KnowledgeService
+
+Creato il servizio che orchestra:
+
+DocumentLoader
+
+        |
+        v
+
+EmbeddingService
+
+        |
+        v
+
+DocumentEmbedding
+
+        |
+        v
+
+KnowledgeRepository
+
+Responsabilità:
+
+Coordinare il processo completo di creazione della knowledge base.
+
+Non implementa direttamente:
+
+caricamento file;
+generazione embeddings;
+salvataggio.
+
+Utilizza i servizi dedicati.
+
+Introduzione Semantic Search
+
+Abbiamo iniziato la progettazione del modulo:
+
+src/ai_brain/search/
+
+├── __init__.py
+└── service.py
+Concetto introdotto: Query Embedding
+
+Una ricerca semantica non confronta direttamente:
+
+testo query
+
+contro
+
+testo documenti
+
+ma trasforma entrambi in vettori.
+
+Esempio:
+
+Query:
+
+"Come posso imparare Python?"
+
+diventa:
+
+[
+0.123,
+0.456,
+...
+]
+
+Successivamente viene confrontata con gli embeddings già salvati.
+
+Decisione sul risultato della ricerca
+
+Per la prima versione il metodo:
+
+search(query)
+
+restituirà:
+
+[
+    ("python", 0.91),
+    ("machine_learning", 0.72)
+]
+
+Motivazione:
+
+semplice da analizzare;
+permette di capire il comportamento del modello;
+facilita debugging e test.
+
+In futuro potrà evolvere in un oggetto:
+
+SearchResult
+
+contenente:
+
+documento;
+score;
+metadata.
+Libreria scelta per Similarity Search
+
+Per il confronto tra embeddings verrà utilizzata:
+
+scikit-learn
+
+con:
+
+sklearn.metrics.pairwise.cosine_similarity
+
+Motivazione:
+
+La cosine similarity è una metrica molto utilizzata per confrontare embeddings perché misura la vicinanza semantica tra vettori.
+
+Struttura futura della Semantic Search
+User Query
+
+      |
+      v
+
+EmbeddingService
+
+      |
+      v
+
+Query Embedding
+
+      |
+      v
+
+Confronto con embeddings salvati
+
+      |
+      v
+
+Cosine Similarity
+
+      |
+      v
+
+Ranking risultati
+
+      |
+      v
+
+Top-K documents
+Concetti AI introdotti
+
+Durante questa sessione sono stati introdotti:
+
+embeddings;
+query embeddings;
+semantic search;
+cosine similarity;
+similarity ranking;
+pipeline RAG (Retrieval Augmented Generation).
+Prossimi step
+Step 1
+
+Implementare:
+
+KnowledgeRepository.load()
+
+per leggere:
+
+data/knowledge_base.json
+
+e ricostruire:
+
+DocumentEmbedding[]
+Step 2
+
+Completare:
+
+SearchService
+
+Implementando:
+
+caricamento knowledge base;
+embedding della query;
+cosine similarity;
+ordinamento risultati.
+Step 3
+
+Creare test automatici:
+
+Esempio:
+
+Query:
+
+"voglio programmare in Python"
+
+Aspettarsi:
+
+python.md
+
+come primo risultato.
+
+Stato progetto
+
+Completato:
+
+✅ Setup progetto
+✅ FastAPI base
+✅ EmbeddingService
+✅ DocumentLoader
+✅ Document model
+✅ DocumentEmbedding model
+✅ KnowledgeRepository save
+✅ KnowledgeService pipeline iniziale
+
+In sviluppo:
+
+🚧 Semantic Search
+
+
+---
+
+# Recap — Sprint 3: Semantic Search
+
+## Obiettivo dello Sprint
+
+Implementare una prima versione di **Semantic Search**:
+
+> data una query in linguaggio naturale, trovare i documenti semanticamente più simili utilizzando gli embedding.
+
+La pipeline realizzata è:
+
+```text
+Query utente
+    ↓
+EmbeddingService
+    ↓
+Embedding della query
+    ↓
+KnowledgeRepository.load()
+    ↓
+Embedding dei documenti già salvati
+    ↓
+Cosine Similarity
+    ↓
+Ranking
+    ↓
+Top-K risultati
+```
+
+---
+
+## 1. KnowledgeRepository.load()
+
+Abbiamo completato il metodo `load()` in:
+
+```text
+src/ai_brain/knowledge/repository.py
+```
+
+Il metodo legge:
+
+```text
+data/knowledge_base.json
+```
+
+e ricostruisce gli oggetti `DocumentEmbedding`.
+
+Il flusso inverso rispetto a `save()` è:
+
+```text
+JSON
+ ↓
+dict
+ ↓
+Document
+ ↓
+DocumentEmbedding
+```
+
+Importante: `load()` **non genera nuovamente gli embedding**.
+
+Gli embedding sono già presenti nel JSON perché sono stati generati durante la costruzione della knowledge base.
+
+### Verifica manuale
+
+Abbiamo verificato che i documenti venissero caricati correttamente e che gli embedding mantenessero la dimensione di 384.
+
+Esempio:
+
+```text
+Documenti caricati: 4
+Python
+Embedding dimension: 384
+Java
+Embedding dimension: 384
+Machine Learning
+Embedding dimension: 384
+Pizza
+Embedding dimension: 384
+```
+
+---
+
+## 2. SearchService
+
+Abbiamo completato:
+
+```text
+src/ai_brain/search/service.py
+```
+
+Il `SearchService` si occupa di:
+
+1. caricare la knowledge base;
+2. trasformare la query in embedding;
+3. recuperare gli embedding dei documenti;
+4. calcolare la cosine similarity;
+5. associare ogni documento al proprio score;
+6. ordinare i risultati dal più simile al meno simile;
+7. restituire i primi `top_k`.
+
+La ricerca restituisce attualmente risultati nella forma:
+
+```python
+[
+    ("python", 0.58),
+    ("pizza", 0.34),
+    ("java", 0.27)
+]
+```
+
+Abbiamo scelto volutamente una struttura semplice invece di introdurre subito una classe `SearchResult`.
+
+---
+
+## 3. Cosine Similarity
+
+Per confrontare gli embedding abbiamo utilizzato Scikit-learn:
+
+```python
+from sklearn.metrics.pairwise import cosine_similarity
+```
+
+Non abbiamo implementato manualmente la formula perché Scikit-learn fornisce già una soluzione affidabile e standard.
+
+La cosine similarity misura quanto due vettori sono orientati nella stessa direzione nello spazio degli embedding.
+
+Importante:
+
+```text
+0.58
+```
+
+non significa "58% di certezza".
+
+È un **punteggio di similarità**, utilizzato per confrontare e ordinare i documenti.
+
+---
+
+## 4. Test della Semantic Search
+
+Abbiamo creato:
+
+```text
+tests/test_search_service.py
+```
+
+con un test che verifica che una query relativa a Python restituisca `python` come documento più rilevante.
+
+Il test verifica il comportamento:
+
+```python
+assert len(results) > 0
+assert results[0][0] == "python"
+```
+
+Non verifichiamo il valore esatto dello score perché il punteggio potrebbe variare leggermente in base alle versioni delle librerie o del modello.
+
+### Risultato
+
+Tutti i test passano:
+
+```text
+100% passed
+```
+
+---
+
+## 5. Verifica manuale
+
+Abbiamo testato:
+
+```text
+"Come funziona Python?"
+```
+
+ottenendo:
+
+```text
+python 0.5879818633057421
+pizza 0.34440421553825895
+java 0.272665288423344...
+```
+
+Il risultato conferma che la semantic search sta funzionando: il documento `python` viene classificato come il più rilevante.
+
+---
+
+## 6. Warning Hugging Face
+
+Durante l'esecuzione è comparso:
+
+```text
+Warning: You are sending unauthenticated requests to the HF Hub.
+Please set a HF_TOKEN...
+```
+
+Non è un errore.
+
+Il modello è stato comunque scaricato e utilizzato correttamente.
+
+Per il momento non è necessario configurare un token Hugging Face.
+
+---
+
+# Concetti acquisiti
+
+Durante questo sprint abbiamo utilizzato concretamente:
+
+* **Sentence Transformers** → generazione degli embedding;
+* **NumPy** → gestione dei vettori;
+* **Scikit-learn** → cosine similarity;
+* **JSON** → persistenza della knowledge base;
+* **Repository pattern** → separazione della persistenza;
+* **Service** → orchestrazione della logica applicativa;
+* **pytest** → test automatici;
+* **Semantic Search** → ricerca basata sul significato anziché sulle sole keyword.
+
+---
+
+# Stato del progetto
+
+A questo punto il progetto è in grado di:
+
+```text
+1. leggere documenti
+2. generare embedding
+3. salvare gli embedding
+4. ricaricarli
+5. ricevere una query
+6. generare l'embedding della query
+7. confrontarlo con gli embedding dei documenti
+8. classificare i documenti per similarità
+```
+
+La parte di **Semantic Search fondamentale è completata**.
+
+---
+
+# Prossimo Sprint — RAG + LLM
+
+Il prossimo obiettivo sarà trasformare la Semantic Search in un sistema **RAG (Retrieval-Augmented Generation)**.
+
+La nuova pipeline sarà:
+
+```text
+Domanda utente
+      ↓
+Semantic Search
+      ↓
+Documenti rilevanti
+      ↓
+Context
+      ↓
+LLM
+      ↓
+Risposta
+```
+
+Per il momento abbiamo volutamente evitato LangChain.
+
+Questo ci permette di capire prima cosa succede realmente sotto il cofano.
+
+Nel prossimo sprint introdurremo il concetto di **RAG** e successivamente valuteremo dove LangChain può semplificare la pipeline senza nascondere i concetti fondamentali.
+
+
+
+# AI Personal Knowledge Engine — Project Recap
+
+## Sprint 4 — RAG + Local LLM
+
+### Obiettivo
+
+Collegare la semantic search al modello linguistico locale per ottenere una prima pipeline **RAG (Retrieval-Augmented Generation)** funzionante.
+
+L'obiettivo era capire il funzionamento della RAG manualmente, senza introdurre ancora LangChain.
+
+---
+
+# 1. SearchResult
+
+Abbiamo modificato il risultato della ricerca semantica.
+
+Prima:
+
+```python
+("python", 0.58)
+```
+
+Ora:
+
+```python
+SearchResult(
+    document=document,
+    score=0.58
+)
+```
+
+con:
+
+```python
+@dataclass
+class SearchResult:
+    document: Document
+    score: float
+```
+
+### Perché?
+
+Perché per una RAG non basta sapere quale documento è rilevante.
+
+Dobbiamo anche avere accesso al suo contenuto:
+
+```python
+result.document.content
+```
+
+Questo permette di passare il contenuto del documento al modello LLM.
+
+---
+
+# 2. Test
+
+Abbiamo aggiornato il test di `SearchService`.
+
+Il test verifica che una domanda su Python restituisca il documento Python come risultato più rilevante.
+
+Tutti i test sono passati:
+
+```text
+tests\test_api.py              .   [ 25%]
+tests\test_embeddings.py       ..  [ 75%]
+tests\test_search_service.py   .   [100%]
+```
+
+Quindi:
+
+* API funzionante
+* Embedding funzionanti
+* Search funzionante
+* SearchResult funzionante
+
+---
+
+# 3. LLM locale
+
+Abbiamo deciso di non utilizzare API a pagamento.
+
+È stato installato **Ollama** e abbiamo utilizzato:
+
+```text
+qwen2.5:3b
+```
+
+Il modello gira localmente sulla macchina.
+
+Abbiamo creato:
+
+```text
+src/ai_brain/llm/service.py
+```
+
+con `LLMService`.
+
+Responsabilità:
+
+```text
+Prompt
+  ↓
+LLMService
+  ↓
+Ollama
+  ↓
+Qwen 2.5:3b
+  ↓
+Response
+```
+
+Il servizio espone:
+
+```python
+generate(prompt)
+```
+
+in modo che il resto dell'applicazione non debba conoscere direttamente Ollama.
+
+---
+
+# 4. RAGService
+
+Abbiamo creato:
+
+```text
+src/ai_brain/rag/
+├── __init__.py
+└── service.py
+```
+
+Il `RAGService` coordina:
+
+```text
+SearchService
+      +
+LLMService
+```
+
+La pipeline implementata è:
+
+```text
+Question
+    ↓
+SearchService
+    ↓
+Relevant Documents
+    ↓
+Document.content
+    ↓
+Context
+    ↓
+Prompt
+    ↓
+LLMService
+    ↓
+Qwen 2.5:3b
+    ↓
+Answer
+```
+
+Il metodo principale è:
+
+```python
+answer(question, top_k=3)
+```
+
+---
+
+# 5. Come funziona realmente la RAG
+
+Abbiamo chiarito che l'embedding continua ad essere fondamentale nella RAG.
+
+## Indicizzazione
+
+Quando costruiamo la Knowledge Base:
+
+```text
+Documenti
+    ↓
+EmbeddingService
+    ↓
+Document embeddings
+    ↓
+knowledge_base.json
+```
+
+Gli embedding vengono salvati insieme ai documenti.
+
+Nel nostro caso utilizziamo `all-MiniLM-L6-v2`, che produce embedding di dimensione 384.
+
+## Retrieval
+
+Quando arriva una domanda:
+
+```text
+"Come funziona Python?"
+        ↓
+Embedding della domanda
+        ↓
+Cosine similarity
+        ↓
+Confronto con gli embedding salvati
+        ↓
+Ranking
+        ↓
+Documenti più rilevanti
+```
+
+Questa è la parte **Retrieval** della RAG.
+
+---
+
+# 6. Generation
+
+Dopo aver recuperato i documenti:
+
+```text
+SearchResult
+    ↓
+Document.content
+    ↓
+Context
+```
+
+Il contesto viene inserito nel prompt:
+
+```text
+CONTESTO:
+[contenuto dei documenti rilevanti]
+
+DOMANDA:
+[domanda dell'utente]
+```
+
+Questo prompt viene inviato al:
+
+```text
+LLMService
+    ↓
+Ollama
+    ↓
+Qwen 2.5:3b
+```
+
+Il modello genera quindi la risposta.
+
+---
+
+# 7. Esperimento RAG
+
+Abbiamo testato:
+
+```text
+"Che cos'è Python?"
+```
+
+Il sistema ha recuperato il documento relativo a Python e il modello ha prodotto una risposta coerente con il contesto.
+
+Abbiamo poi fatto un test ancora più importante:
+
+```text
+"Qual è la capitale del Giappone?"
+```
+
+Il database non contiene informazioni sul Giappone.
+
+Il modello ha risposto sostanzialmente che il contesto non conteneva informazioni sufficienti.
+
+Questo ci ha permesso di verificare il comportamento di grounding del nostro prompt RAG.
+
+---
+
+# 8. Concetto fondamentale imparato
+
+Abbiamo distinto chiaramente i due componenti principali:
+
+```text
+RAG
+│
+├── Retrieval
+│     ├── Embedding
+│     ├── Cosine similarity
+│     └── Document retrieval
+│
+└── Generation
+      └── LLM
+```
+
+Una formulazione utile da ricordare:
+
+> Gli embedding e la ricerca trovano cosa dare al modello; l'LLM trasforma quelle informazioni in una risposta.
+
+Quindi il lavoro fatto precedentemente con `SearchService` era già una parte fondamentale della RAG.
+
+La RAG ha semplicemente aggiunto il passaggio:
+
+```text
+Document retrieval
+      ↓
+Context
+      ↓
+LLM
+      ↓
+Answer
+```
+
+---
+
+# Stato attuale del progetto
+
+La pipeline complessiva è ora:
+
+```text
+Markdown Documents
+        ↓
+DocumentLoader
+        ↓
+EmbeddingService
+        ↓
+KnowledgeRepository
+        ↓
+knowledge_base.json
+        ↓
+SearchService
+        ↓
+RAGService
+        ↓
+LLMService
+        ↓
+Ollama / Qwen 2.5:3b
+        ↓
+Answer
+```
+
+Abbiamo quindi costruito manualmente una prima **pipeline RAG end-to-end funzionante**.
+
+---
+
+# Cosa NON abbiamo ancora fatto
+
+Per mantenere il progetto semplice non abbiamo ancora introdotto:
+
+* LangChain
+* LangGraph
+* Vector Database
+* API `/ask`
+* frontend
+* sistemi agentici
+* orchestrazione complessa
+
+Sono volutamente rimandati.
+
+---
+
+# Prossimo step
+
+Il prossimo passo sarà esporre la RAG attraverso la nostra API:
+
+```text
+POST /ask
+      ↓
+RAGService
+      ↓
+SearchService
+      ↓
+LLMService
+      ↓
+JSON response
+```
+
+Dopo aver verificato che anche l'API funziona, potremo finalmente confrontare la nostra implementazione manuale con **LangChain** e capire concretamente quali problemi risolve e quali astrazioni introduce.
+
+## Milestone raggiunta
+
+**Manual RAG end-to-end: COMPLETATA ✅**

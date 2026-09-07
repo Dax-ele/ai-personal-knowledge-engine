@@ -236,3 +236,6 @@ __pycache__/
 
 # Local data
 data/
+
+
+ApiKey.txt

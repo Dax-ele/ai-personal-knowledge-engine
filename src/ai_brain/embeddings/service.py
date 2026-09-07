@@ -32,3 +32,4 @@ class EmbeddingService:
         )
 
         return float(score[0][0])
+    
