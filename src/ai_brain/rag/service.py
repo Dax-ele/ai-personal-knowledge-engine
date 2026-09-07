@@ -12,7 +12,10 @@ class RAGService:
             question,
             top_k=top_k
         )
-
+        if not results:
+            return (
+            "Non ho trovato informazioni sufficienti nella knowledge base.",[]
+            )
         context = "\n\n".join(
             result.document.content
             for result in results
@@ -31,13 +34,6 @@ Se il contesto non contiene informazioni sufficienti,
 dillo esplicitamente senza inventare informazioni.
 """
 
-        return self.llm_service.generate(prompt)
+        answer = self.llm_service.generate(prompt)
 
-if __name__ == "__main__":
-    service = RAGService()
-
-    answer = service.answer(
-        "Qual è la capitale del Giappone?"
-    )
-
-    print(answer)
+        return answer, results

@@ -20,7 +20,7 @@ class SearchService:
         self.embedding_service = EmbeddingService()
         self.repository = KnowledgeRepository()
 
-    def search(self, query, top_k=3):
+    def search(self, query, top_k=3,score_threshold=0.5):
         items = self.repository.load()
 
         query_embedding = self.embedding_service.encode([query])
@@ -38,12 +38,15 @@ class SearchService:
         results = []
 
         for item, score in zip(items, similarities):
-            results.append(
-                SearchResult(
-                    document=item.document,
-                    score=float(score)
+            score = float(score)
+
+            if score >= score_threshold:
+                results.append(
+                    SearchResult(
+                        document=item.document,
+                        score=float(score)
+                    )
                 )
-            )
 
         results.sort(
             key=lambda result: result.score,

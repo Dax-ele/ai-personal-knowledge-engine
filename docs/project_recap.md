@@ -1423,3 +1423,321 @@ Dopo aver verificato che anche l'API funziona, potremo finalmente confrontare la
 ## Milestone raggiunta
 
 **Manual RAG end-to-end: COMPLETATA ✅**
+
+# Recap sessione — LangChain e FAISS
+
+## Obiettivo della sessione
+
+Continuare l'introduzione di **LangChain** nel progetto, senza sostituire subito la nostra implementazione manuale.
+
+L'obiettivo è capire cosa LangChain astragga rispetto a quello che abbiamo già costruito manualmente.
+
+---
+
+## 1. Abbiamo introdotto LangChain
+
+Abbiamo installato:
+
+```powershell
+python -m pip install langchain langchain-community
+python -m pip install -U langchain-huggingface
+pip freeze > requirements.txt
+```
+
+Per ora utilizziamo LangChain come **seconda implementazione parallela** del sistema RAG.
+
+La nostra implementazione manuale rimane intatta.
+
+---
+
+## 2. Abbiamo creato l'adapter per gli embeddings
+
+File:
+
+```text
+src/ai_brain/rag/langchain_embeddings.py
+```
+
+Abbiamo creato:
+
+```python
+class LangChainEmbeddingAdapter(Embeddings):
+```
+
+Questo adapter permette a LangChain di utilizzare il nostro `EmbeddingService`.
+
+In pratica:
+
+```text
+EmbeddingService
+       ↓
+LangChainEmbeddingAdapter
+       ↓
+LangChain
+```
+
+Abbiamo capito la differenza tra:
+
+* `embed_documents()` → genera embeddings per i documenti
+* `embed_query()` → genera l'embedding della query
+
+Non abbiamo quindi duplicato la logica di embedding.
+
+---
+
+## 3. Abbiamo creato LangChainService
+
+File:
+
+```text
+src/ai_brain/rag/langchain_service.py
+```
+
+Il servizio:
+
+1. carica i documenti con `DocumentLoader`
+2. li converte nei `Document` di LangChain
+3. aggiunge i metadata:
+
+   * `id`
+   * `title`
+4. crea un vector store FAISS
+5. espone un Retriever
+
+La struttura attuale è:
+
+```text
+DocumentLoader
+      ↓
+LangChain Document
+      ↓
+Embedding Adapter
+      ↓
+FAISS Vector Store
+      ↓
+Retriever
+```
+
+---
+
+## 4. Abbiamo avuto un primo errore con FAISS
+
+Inizialmente avevamo creato il vector store senza fornire a FAISS l'oggetto embeddings.
+
+Questo provocava un errore durante la ricerca perché FAISS non sapeva come trasformare la query in un vettore.
+
+Abbiamo quindi capito un concetto importante:
+
+> Il vector store deve sapere come trasformare una nuova query in un embedding.
+
+Abbiamo risolto passando:
+
+```python
+embedding=self.embeddings
+```
+
+a FAISS.
+
+---
+
+## 5. Abbiamo verificato il Retriever
+
+Con:
+
+```python
+retriever = vector_store.as_retriever(
+    search_kwargs={
+        "k": 3
+    }
+)
+```
+
+abbiamo eseguito:
+
+```text
+"Come funziona Python?"
+```
+
+ottenendo:
+
+```text
+Python
+Pizza
+Java
+```
+
+Quindi abbiamo verificato che:
+
+* il vector store funziona
+* gli embeddings funzionano
+* FAISS funziona
+* il Retriever funziona
+
+---
+
+## 6. Abbiamo incontrato il problema del threshold
+
+Abbiamo provato:
+
+```python
+search_type="similarity_score_threshold"
+```
+
+con una soglia, ad esempio:
+
+```python
+score_threshold=0.5
+```
+
+e abbiamo ricevuto un warning relativo ai relevance score.
+
+Questo ci ha portato a distinguere due concetti:
+
+### Cosine similarity
+
+Era quella utilizzata dal nostro `SearchService`.
+
+In quel caso:
+
+```text
+più alto = più simile
+```
+
+### Distanza FAISS
+
+FAISS, nella configurazione attuale, ci sta restituendo una distanza L2.
+
+In questo caso:
+
+```text
+più basso = più simile
+```
+
+---
+
+## 7. Abbiamo verificato gli score reali di FAISS
+
+Abbiamo eseguito:
+
+```python
+results = vector_store.similarity_search_with_score(
+    "Come funziona Python?",
+    k=3
+)
+```
+
+ottenendo:
+
+```text
+Python 0.82403636
+Pizza 1.3111918
+Java 1.4546695
+```
+
+Questo ci ha permesso di capire definitivamente che stiamo osservando una **distanza**, non una cosine similarity.
+
+Quindi:
+
+```text
+Python → 0.824  ← più vicino
+Pizza  → 1.311
+Java   → 1.455  ← più lontano
+```
+
+---
+
+# Concetto importante imparato oggi
+
+Il termine generico "score" può essere fuorviante.
+
+A seconda dello strumento possiamo avere:
+
+```text
+Cosine similarity
+↑ valore = maggiore similarità
+
+L2 distance
+↓ valore = maggiore similarità
+```
+
+Non possiamo quindi prendere una soglia come `0.5` dalla nostra implementazione manuale e applicarla automaticamente a FAISS.
+
+Le due metriche devono essere confrontate correttamente.
+
+---
+
+# Stato attuale
+
+La parte LangChain funziona:
+
+```text
+DocumentLoader
+      ↓
+LangChain Documents
+      ↓
+Embeddings
+      ↓
+FAISS
+      ↓
+Retriever
+      ↓
+Documenti rilevanti
+```
+
+Il problema ancora da risolvere è:
+
+> Configurare FAISS/LangChain in modo da utilizzare una metrica coerente con la cosine similarity che abbiamo usato nel nostro `SearchService`.
+
+---
+
+# Prossimo passo
+
+La prossima volta faremo **una sola modifica alla volta**.
+
+Obiettivo:
+
+```text
+Embedding
+    ↓
+normalizzazione
+    ↓
+FAISS con metrica coerente
+    ↓
+cosine similarity
+    ↓
+Retriever
+    ↓
+score_threshold
+```
+
+Dopodiché confronteremo:
+
+```text
+SearchService manuale
+        VS
+LangChain Retriever
+```
+
+per capire concretamente cosa LangChain sta facendo al posto nostro.
+
+---
+
+## Nota architetturale
+
+Non eliminiamo ancora il codice manuale.
+
+Il confronto tra:
+
+```text
+Manual RAG
+```
+
+e
+
+```text
+LangChain RAG
+```
+
+è parte importante dell'apprendimento del progetto.
+
+Solo dopo aver capito la differenza decideremo cosa mantenere.
