@@ -1741,3 +1741,303 @@ LangChain RAG
 è parte importante dell'apprendimento del progetto.
 
 Solo dopo aver capito la differenza decideremo cosa mantenere.
+
+
+
+## Sessione — Chunking e RAG con LangChain
+
+### Obiettivo della sessione
+
+Integrare il **chunking** nella pipeline RAG e verificare che LangChain possa lavorare sui chunk invece che sui documenti interi.
+
+---
+
+### 1. Chunking manuale
+
+Abbiamo creato:
+
+* `src/ai_brain/documents/chunk_models.py`
+* `src/ai_brain/documents/chunker.py`
+
+Il modello `DocumentChunk` contiene:
+
+* `document_id`
+* `chunk_id`
+* `chunk_index`
+* `content`
+* `title`
+
+Il `DocumentChunker` divide un documento in parti utilizzando:
+
+```python
+chunk_size=500
+chunk_overlap=50
+```
+
+Abbiamo verificato però un limite dell'approccio manuale basato sul semplice slicing delle stringhe: può spezzare le parole o il contenuto in punti poco naturali.
+
+Esempio:
+
+```text
+È molto utilizzato nello sviluppo enterprise
+e
+```
+
+seguito da:
+
+```text
+viluppo enterprise
+e nelle applicazioni backend.
+```
+
+---
+
+### 2. Chunking con LangChain
+
+Abbiamo introdotto:
+
+```python
+RecursiveCharacterTextSplitter
+```
+
+tramite il package:
+
+```text
+langchain-text-splitters
+```
+
+Con:
+
+```python
+chunk_size=100
+chunk_overlap=20
+```
+
+abbiamo ottenuto:
+
+```text
+Java              → 2 chunk
+Machine Learning  → 3 chunk
+Pizza             → 1 chunk
+Python            → 2 chunk
+
+Totale            → 8 chunk
+```
+
+Il risultato è migliore rispetto allo slicing manuale perché lo splitter cerca di rispettare i confini naturali del testo, come i paragrafi.
+
+Abbiamo creato:
+
+```text
+src/ai_brain/rag/langchain_chunker.py
+```
+
+con il servizio `LangChainChunker`.
+
+Il servizio utilizza `DocumentLoader` per caricare i documenti e `RecursiveCharacterTextSplitter.create_documents()` per generare i chunk mantenendo i metadata:
+
+```text
+document_id
+title
+```
+
+---
+
+### 3. FAISS sui chunk
+
+Abbiamo modificato `LangChainService` per indicizzare i chunk invece dei documenti originali.
+
+Prima:
+
+```text
+4 documenti
+    ↓
+4 embeddings
+    ↓
+FAISS
+```
+
+Ora:
+
+```text
+4 documenti
+    ↓
+chunking
+    ↓
+8 chunk
+    ↓
+8 embeddings
+    ↓
+FAISS
+```
+
+Il metodo principale è ora:
+
+```python
+load_chunks()
+```
+
+che utilizza `LangChainChunker`.
+
+Il vector store continua a utilizzare:
+
+```python
+faiss.IndexFlatIP
+```
+
+con embeddings normalizzati, così l'Inner Product corrisponde alla cosine similarity.
+
+Manteniamo inoltre:
+
+```python
+relevance_score_fn=lambda score: float(score)
+```
+
+per utilizzare direttamente lo score restituito da FAISS come relevance score.
+
+---
+
+### 4. Test del retrieval sui chunk
+
+Abbiamo verificato il comportamento con:
+
+```text
+"Come funziona Java?"
+```
+
+Risultati:
+
+```text
+Java              0.6089
+Machine Learning  0.2814
+Pizza             0.2300
+```
+
+Il chunk Java viene quindi recuperato correttamente come risultato più rilevante.
+
+Questo conferma che il vector store sta effettuando il retrieval a livello di **chunk**.
+
+---
+
+### 5. RAG con chunk
+
+Abbiamo verificato anche il `LangChainRAGService`.
+
+Domanda:
+
+```text
+Qual è il ruolo di Java nello sviluppo backend?
+```
+
+Risposta:
+
+```text
+Java è molto utilizzato nello sviluppo backend.
+```
+
+La fonte recuperata è il chunk Java contenente:
+
+```text
+È molto utilizzato nello sviluppo enterprise
+e nelle applicazioni backend.
+```
+
+Il RAG ora utilizza quindi effettivamente il chunk come contesto per il modello.
+
+---
+
+### Pipeline attuale
+
+```text
+Markdown documents
+        ↓
+   DocumentLoader
+        ↓
+RecursiveCharacterTextSplitter
+        ↓
+      Chunks
+        ↓
+Sentence Transformers
+(all-MiniLM-L6-v2)
+        ↓
+      FAISS
+        ↓
+    Retriever
+        ↓
+     Context
+        ↓
+   Ollama / Qwen 2.5 3B
+        ↓
+      Answer
+```
+
+---
+
+### Concetti appresi
+
+In questa fase abbiamo introdotto:
+
+* Text chunking
+* Chunk overlap
+* Recursive character splitting
+* Document retrieval vs chunk retrieval
+* Vector Store
+* FAISS
+* Retriever
+* RAG con chunk
+* Similarity score
+* Limiti del similarity score come indicatore della qualità della risposta
+
+Un punto importante emerso durante il progetto è che:
+
+> **Similarity score ≠ qualità della risposta**
+
+Un chunk può essere semanticamente simile alla domanda ma non contenere necessariamente informazioni sufficienti per rispondere correttamente.
+
+---
+
+### Stato attuale
+
+La pipeline RAG con chunking è funzionante.
+
+Tecnologie principali utilizzate:
+
+```text
+Python
+Sentence Transformers
+NumPy
+scikit-learn
+FAISS
+LangChain
+LangChain Text Splitters
+Ollama
+Qwen 2.5 3B
+```
+
+---
+
+### Prossimo step
+
+Il prossimo obiettivo è introdurre una prima forma di **Retrieval Evaluation**.
+
+Vogliamo passare da:
+
+```text
+"Il retrieval sembra funzionare."
+```
+
+a:
+
+```text
+"Possiamo misurare quanto bene funziona."
+```
+
+Partiremo da un piccolo dataset di domande con risultati attesi e introdurremo gradualmente:
+
+* Top-K
+* Score threshold
+* Hit@K
+* Precision@K
+* Recall@K
+
+L'obiettivo è capire concretamente come valutare e migliorare il componente di retrieval prima di aggiungere ulteriore complessità al sistema.
